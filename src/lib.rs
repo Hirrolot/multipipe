@@ -9,9 +9,17 @@ pub trait Pipe: Sized {
     where
         Pipeline<Types, F>: PipelineCall<Self, Out>;
 
-    fn pipe_ref<Out>(&self, f: impl FnOnce(&Self) -> Out) -> Out;
+    fn pipe_ref<'a, Out, TRef, F>(&'a self, f: F) -> Out
+    where
+        Self: AsRef<TRef>,
+        TRef: ?Sized + 'a,
+        F: FnOnce(&'a TRef) -> Out;
 
-    fn pipe_mut<Out>(&mut self, f: impl FnOnce(&mut Self) -> Out) -> Out;
+    fn pipe_mut<'a, Out, TMut, F>(&'a mut self, f: F) -> Out
+    where
+        Self: AsMut<TMut>,
+        TMut: ?Sized + 'a,
+        F: FnOnce(&'a mut TMut) -> Out;
 }
 
 impl<T> Pipe for T
@@ -25,12 +33,22 @@ where
         f.into().call(self)
     }
 
-    fn pipe_ref<Out>(&self, f: impl FnOnce(&Self) -> Out) -> Out {
-        f(self)
+    fn pipe_ref<'a, Out, TRef, F>(&'a self, f: F) -> Out
+    where
+        Self: AsRef<TRef>,
+        TRef: ?Sized + 'a,
+        F: FnOnce(&'a TRef) -> Out,
+    {
+        f(self.as_ref())
     }
 
-    fn pipe_mut<Out>(&mut self, f: impl FnOnce(&mut Self) -> Out) -> Out {
-        f(self)
+    fn pipe_mut<'a, Out, TMut, F>(&'a mut self, f: F) -> Out
+    where
+        Self: AsMut<TMut>,
+        TMut: ?Sized + 'a,
+        F: FnOnce(&'a mut TMut) -> Out,
+    {
+        f(self.as_mut())
     }
 }
 
@@ -48,6 +66,18 @@ mod tests {
     struct D;
     #[derive(Eq, PartialEq, Debug)]
     struct E;
+
+    impl AsRef<A> for A {
+        fn as_ref(&self) -> &A {
+            self
+        }
+    }
+
+    impl AsMut<A> for A {
+        fn as_mut(&mut self) -> &mut A {
+            self
+        }
+    }
 
     #[test]
     fn pipe() {
